@@ -6,7 +6,7 @@ A FastAPI-based web application that analyzes facial symmetry using MediaPipe an
 
 1. **Clone the Repository**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/M-E-U-E/facial-symmetry-analyzer.git
    cd facial-symmetry-analyzer
    ```
 
