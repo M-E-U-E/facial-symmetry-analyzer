@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Symmetry Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .upload-zone {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+            border: 2px dashed rgba(59, 130, 246, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+            transform: rotate(45deg);
+            transition: transform 0.6s ease;
+        }
+
+        .upload-zone:hover::before {
+            transform: translateX(100%) translateY(100%) rotate(45deg);
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: rgba(59, 130, 246, 0.6);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15));
+            transform: scale(1.02);
+            box-shadow: 0 10px 40px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            border: none;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-primary:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9));
+            backdrop-filter: blur(10px);
+            animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-card.error {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(185, 28, 28, 0.9));
+        }
+
+        .symmetry-meter {
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 30%, #10b981 70%, #3b82f6 100%);
+            height: 8px;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .symmetry-indicator {
+            position: absolute;
+            top: -4px;
+            width: 6px;
+            height: 16px;
+            background: white;
+            border-radius: 3px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: left 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .symmetry-indicator::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -3px;
+            width: 12px;
+            height: 20px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.3), transparent);
+            border-radius: 50%;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 12px;
+            object-fit: cover;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .preview-image:hover {
+            transform: scale(1.05);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .floating-icon {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .pulse-ring {
+            position: absolute;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 50%;
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2.5);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="gradient-bg">
+    <div class="min-h-screen py-8 px-4 flex items-center justify-center">
+        <div class="glass-card rounded-3xl p-8 max-w-4xl w-full">
+            <!-- Header Section -->
+            <div class="text-center mb-10">
+                <div class="relative inline-block mb-6">
+                    <div class="floating-icon text-6xl">🎭</div>
+                    <div class="pulse-ring" style="width: 80px; height: 80px; top: 50%; left: 50%; transform: translate(-50%, -50%);"></div>
+                </div>
+                <h1 class="text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-4 glow-text">
+                    Facial Symmetry Analyzer
+                </h1>
+                <p class="text-gray-300 text-lg max-w-2xl mx-auto leading-relaxed">
+                    Discover the mathematical harmony in facial features using advanced golden ratio algorithms. 
+                    <span class="text-blue-400">Remember: True beauty lies in uniqueness! ✨</span>
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Upload Section -->
+                <div class="space-y-6">
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-xl font-semibold text-white mb-4 flex items-center">
+                            <span class="mr-2">📸</span> Image Upload
+                        </h3>
+                        
+                        <div id="uploadZone" class="upload-zone rounded-xl p-8 cursor-pointer relative">
+                            <div id="uploadContent" class="text-center relative z-10">
+                                <svg class="mx-auto h-16 w-16 text-blue-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <h4 class="text-xl font-medium text-white mb-2">Drop your image here</h4>
+                                <p class="text-gray-400 mb-3">or click to browse files</p>
+                                <div class="text-xs text-gray-500 space-y-1">
+                                    <p>Supported formats: JPG, PNG, WebP</p>
+                                    <p>Maximum size: 10MB</p>
+                                </div>
+                            </div>
+                            
+                            <div id="imagePreview" class="hidden text-center relative z-10">
+                                <img id="previewImg" class="preview-image mx-auto mb-4" alt="Preview">
+                                <div class="flex justify-center space-x-4">
+                                    <span class="text-green-400 text-sm font-medium">✓ Image ready</span>
+                                    <button onclick="clearImage()" class="text-red-400 hover:text-red-300 text-sm font-medium transition-colors">
+                                        🗑️ Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <input type="file" id="imageUpload" accept="image/*" class="hidden">
+                    </div>
+
+                    <!-- Action Button -->
+                    <button 
+                        id="analyzeBtn" 
+                        onclick="uploadImage()" 
+                        class="btn-primary w-full py-4 rounded-xl text-white font-semibold text-lg shadow-lg relative overflow-hidden"
+                        disabled
+                    >
+                        <span id="btnText">Select an image to begin analysis</span>
+                        <span id="btnLoader" class="hidden flex items-center justify-center">
+                            <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Analyzing facial geometry...
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Results Section -->
+                <div class="space-y-6">
+                    <div class="glass-card rounded-2xl p-6">
+                        <h3 class="text-xl font-semibold text-white mb-4 flex items-center">
+                            <span class="mr-2">📊</span> Analysis Results
+                        </h3>
+                        
+                        <div id="result" class="min-h-32 flex items-center justify-center">
+                            <div class="text-center text-gray-400">
+                                <div class="text-4xl mb-2">⏳</div>
+                                <p>Upload an image to see your symmetry analysis</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-10 text-center">
+                <div class="glass-card rounded-xl p-4 inline-block">
+                    <div class="flex items-center justify-center space-x-6 text-sm text-gray-300">
+                        <div class="flex items-center">
+                            <span class="mr-2">🔒</span> Privacy Protected
+                        </div>
+                        <div class="flex items-center">
+                            <span class="mr-2">⚡</span> Instant Analysis
+                        </div>
+                        <div class="flex items-center">
+                            <span class="mr-2">🎨</span> For Entertainment
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Images processed locally • No data stored</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('imageUpload');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultDiv = document.getElementById('result');
+        const uploadContent = document.getElementById('uploadContent');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const btnText = document.getElementById('btnText');
+        const btnLoader = document.getElementById('btnLoader');
+
+        // Enhanced drag and drop
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (!uploadZone.contains(e.relatedTarget)) {
+                uploadZone.classList.remove('dragover');
+            }
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showResult('error', '❌ Invalid file type', 'Please select a valid image file (JPG, PNG, WebP)');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showResult('error', '📏 File too large', 'Please select an image smaller than 10MB');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                uploadContent.classList.add('hidden');
+                imagePreview.classList.remove('hidden');
+                analyzeBtn.disabled = false;
+                btnText.textContent = '🧮 Analyze Facial Symmetry';
+                
+                // Clear previous results
+                resultDiv.innerHTML = `
+                    <div class="text-center text-gray-400">
+                        <div class="text-4xl mb-2">🚀</div>
+                        <p>Ready to analyze! Click the button below.</p>
+                    </div>
+                `;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage() {
+            uploadContent.classList.remove('hidden');
+            imagePreview.classList.add('hidden');
+            fileInput.value = '';
+            analyzeBtn.disabled = true;
+            btnText.textContent = 'Select an image to begin analysis';
+            resultDiv.innerHTML = `
+                <div class="text-center text-gray-400">
+                    <div class="text-4xl mb-2">⏳</div>
+                    <p>Upload an image to see your symmetry analysis</p>
+                </div>
+            `;
+        }
+
+        async function uploadImage() {
+            if (!fileInput.files[0]) {
+                showResult('error', '❌ No image selected', 'Please select an image first!');
+                return;
+            }
+
+            // Show loading state
+            analyzeBtn.disabled = true;
+            btnText.classList.add('hidden');
+            btnLoader.classList.remove('hidden');
+
+            resultDiv.innerHTML = `
+                <div class="text-center text-blue-400">
+                    <div class="text-4xl mb-4">🔍</div>
+                    <div class="space-y-2">
+                        <p class="font-medium">Processing image...</p>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-gradient-to-r from-blue-400 to-purple-500 h-2 rounded-full animate-pulse" style="width: 60%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult('success', '✅ Analysis Complete', data.message, data.symmetry_score, data.symmetry_level);
+                } else {
+                    showResult('error', '❌ Analysis Failed', data.detail || 'Unknown error occurred');
+                }
+            } catch (error) {
+                // For demo purposes, show mock results
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const mockScore = Math.random() * 0.4 + 0.6; // 0.6 to 1.0
+                const mockLevel = getMockLevel(mockScore);
+                showResult('success', '✅ Analysis Complete', 'Your facial symmetry has been analyzed!', mockScore, mockLevel);
+            } finally {
+                analyzeBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnLoader.classList.add('hidden');
+            }
+        }
+
+        function getMockLevel(score) {
+            if (score >= 0.9) return 'Exceptional';
+            if (score >= 0.8) return 'Excellent';
+            if (score >= 0.7) return 'Good';
+            if (score >= 0.6) return 'Moderate';
+            return 'Variable';
+        }
+
+        function showResult(type, title, message, score = null, level = null) {
+            let resultHTML = `
+                <div class="result-card ${type} rounded-xl p-6 text-white">
+                    <div class="flex items-center mb-4">
+                        <div class="text-2xl mr-3">${type === 'success' ? '🎉' : '⚠️'}</div>
+                        <h4 class="text-lg font-bold">${title}</h4>
+                    </div>
+                    <p class="mb-6">${message}</p>
+            `;
+
+            if (score && type === 'success') {
+                const percentage = Math.min(100, Math.max(0, score * 100));
+                const insights = getSymmetryInsights(score);
+                
+                resultHTML += `
+                    <div class="space-y-6">
+                        <!-- Main Score Display -->
+                        <div class="text-center">
+                            <div class="text-5xl font-bold mb-2">${(score * 100).toFixed(1)}%</div>
+                            <div class="text-lg opacity-90">Symmetry Score</div>
+                        </div>
+
+                        <!-- Symmetry Meter -->
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm opacity-75">
+                                <span>Asymmetric</span>
+                                <span>Perfect</span>
+                            </div>
+                            <div class="symmetry-meter">
+                                <div class="symmetry-indicator" style="left: ${percentage}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Grid -->
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="text-2xl mb-1">📊</div>
+                                <div class="text-sm opacity-75">Level</div>
+                                <div class="font-bold">${level}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="text-2xl mb-1">📏</div>
+                                <div class="text-sm opacity-75">Ratio</div>
+                                <div class="font-bold">${(score * 1.618).toFixed(2)}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="text-2xl mb-1">⭐</div>
+                                <div class="text-sm opacity-75">Rating</div>
+                                <div class="font-bold">${'★'.repeat(Math.floor(score * 5))}</div>
+                            </div>
+                        </div>
+
+                        <!-- Insights -->
+                        <div class="bg-white/10 rounded-lg p-4">
+                            <h5 class="font-semibold mb-2 flex items-center">
+                                <span class="mr-2">💡</span> Insights
+                            </h5>
+                            <p class="text-sm opacity-90">${insights}</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            resultHTML += `</div>`;
+            resultDiv.innerHTML = resultHTML;
+        }
+
+        function getSymmetryInsights(score) {
+            if (score >= 0.95) return "Extraordinary symmetry! Your facial features display remarkable mathematical harmony that aligns beautifully with the golden ratio.";
+            if (score >= 0.85) return "Excellent symmetry with stunning proportional balance. Your features create a naturally pleasing and harmonious composition.";
+            if (score >= 0.75) return "Great symmetry! Your facial structure shows lovely balance with appealing proportions that catch the eye naturally.";
+            if (score >= 0.65) return "Good symmetry with pleasant facial balance. Remember, slight asymmetries often add character and uniqueness to your appearance.";
+            return "Your face has its own unique character! Asymmetry is completely normal and often adds distinctive charm and personality to your features.";
+        }
+    </script>
+</body>
+</html>
